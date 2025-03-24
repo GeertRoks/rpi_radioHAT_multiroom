@@ -1,0 +1,22 @@
+---
+services:
+
+  snapserver:
+    build: ./snapserver
+    ports:
+      - "1704:1704"
+      - "1705:1705"
+      - "1780:1780"
+    volumes:
+      - streamfile:/tmp
+
+  radio:
+    build: ./radio
+    ports:
+      - "6601:6600"
+    volumes:
+      - streamfile:/tmp
+   
+volumes:
+  streamfile:
+    name: streamfile
