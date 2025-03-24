@@ -9,6 +9,11 @@ services:
       - "1780:1780"
     volumes:
       - streamfile:/tmp
+    env_file:
+      - .env
+    networks:
+      snapcast_network:
+        ipv4_address: ${SNAPSERVER_IP}
 
   radio:
     build: ./radio
@@ -20,3 +25,14 @@ services:
 volumes:
   streamfile:
     name: streamfile
+
+networks:
+  snapcast_network:
+    driver: macvlan
+    driver_opts:
+      parent: ${MACVLAN_PARENT_INTERFACE}
+    ipam:
+      config:
+        - subnet: ${MACVLAN_SUBNET}
+          ip_range: ${MACVLAN_IP}
+          gateway: ${MACVLAN_GATEWAY}
