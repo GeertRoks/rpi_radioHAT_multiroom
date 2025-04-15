@@ -2,10 +2,25 @@ import os
 from dotenv import load_dotenv
 import socket
 import json
+from enum import Enum
 
 import RPi.GPIO as GPIO
 
 import signal
+
+# Define GPIO ports
+SPOTIFY_LED = 17
+RADIO_LED = 27
+RADIO_BTN = 24
+SRC_SEL_RADIO = 22
+SRC_SEL_SPOTIFY = 23
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(SPOTIFY_LED, GPIO.OUT)
+GPIO.setup(RADIO_LED, GPIO.OUT)
+GPIO.setup(RADIO_BTN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(SRC_SEL_RADIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(SRC_SEL_SPOTIFY, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 
 # source: https://stackoverflow.com/questions/24426451/how-to-terminate-loop-gracefully-when-ctrlc-was-pressed-in-python
@@ -50,9 +65,7 @@ class ServiceClient:
 
     def sendToServer(self, msg):
         self.sock.send(f"{msg}\n".encode())
-        data = self.readMessage()
-        json_data = json.loads(data)
-        return json_data
+        return self.readMessage()
 
 class MPDClient(ServiceClient):
     def __init__(self, ip, port):
@@ -78,7 +91,13 @@ class SnapClient(ServiceClient):
             msg += ",\"params\":" + params
         msg += "}\n"
         self.msg_count += 1
-        return self.sendToServer(msg)
+        data = self.sendToServer(msg)
+        return json.loads(data)
+
+class Sources(Enum):
+    OFF = 0
+    RADIO = 1
+    SPOTIFY = 2
 
 class RadioState:
 
@@ -104,16 +123,22 @@ class SourceState:
         self.off()
 
     def off(self):
-        self.source_state = 0
+        self.source_state = Sources.OFF
         # set Snapcast source to None
+        GPIO.output(SPOTIFY_LED, GPIO.LOW)
+        GPIO.output(RADIO_LED, GPIO.LOW)
 
     def radio(self):
-        self.source_state = 1
+        self.source_state = Sources.RADIO
         # set Snapcast source to Radio
-    
+        GPIO.output(SPOTIFY_LED, GPIO.LOW)
+        GPIO.output(RADIO_LED, GPIO.HIGH)
+
     def spotify(self):
-        self.source_state = 2
+        self.source_state = Sources.SPOTIFY
         # set Snapcast source to Spotify
+        GPIO.output(SPOTIFY_LED, GPIO.HIGH)
+        GPIO.output(RADIO_LED, GPIO.LOW)
 
     def getState(self):
         return self.source_state
@@ -141,61 +166,43 @@ for group in groups:
             break
 
 
-# Define GPIO ports
-SPOTIFY_LED = 17
-RADIO_LED = 27
-RADIO_BTN = 24
-SRC_SEL_RADIO = 22
-SRC_SEL_SPOTIFY = 23
-
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(SPOTIFY_LED, GPIO.OUT)
-GPIO.setup(RADIO_LED, GPIO.OUT)
-GPIO.setup(RADIO_BTN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(SRC_SEL_RADIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(SRC_SEL_SPOTIFY, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
 flag = GracefulExiter()
 radio_btn_pressed = False
 while True:
-    # Radio station button
-    radio_btn_state = GPIO.input(RADIO_BTN)
-    if (radio_btn_state == GPIO.LOW and not radio_btn_pressed):
-        # send Next command to MPD
-        mpd.sendCommand("next")
-        print("send next to MPD")
-        radio_btn_pressed = True
-    elif (radio_btn_state == GPIO.HIGH and radio_btn_pressed):
-        print("RADIO_BTN: done")
-        radio_btn_pressed = False
-
     # Source select switch
-    source_select_state = ( GPIO.input(SRC_SEL_RADIO), GPIO.input(SRC_SEL_SPOTIFY) )
-    if (source_select_state[0] and source_select_state[1]):
+    source_select_state = {"radio": GPIO.input(SRC_SEL_RADIO), "spotify": GPIO.input(SRC_SEL_SPOTIFY) }
+    if (source_select_state["radio"] and source_select_state["spotify"]):
         # off
-        if source_selector.getState() != 0:
+        if source_selector.getState() != Sources.OFF:
             source_selector.off()
             print(source_selector.getState())
-            # TODO: maybe use muting instead of setting the source to /dev/null?
-            snap.sendCommand("Group.SetStream", "{\"id\":\"" + group_id + "\",\"stream_id\":\"None\"}")
-            GPIO.output(SPOTIFY_LED, GPIO.LOW)
-            GPIO.output(RADIO_LED, GPIO.LOW)
-    elif (source_select_state[0]):
+            snap.sendCommand("Client.SetVolume", "{\"id\":\"" + os.getenv("SNAP_CLIENT_ID") + "\",\"volume\":{\"muted\": true }}")
+    elif (source_select_state["radio"]):
         # radio
-        if source_selector.getState() != 1:
+        if source_selector.getState() != Sources.RADIO:
+            snap.sendCommand("Client.SetVolume", "{\"id\":\"" + os.getenv("SNAP_CLIENT_ID") + "\",\"volume\":{\"muted\": false }}")
             snap.sendCommand("Group.SetStream", "{\"id\": \"" + group_id + "\",\"stream_id\": \"Radio\"}")
             source_selector.radio()
             print(source_selector.getState())
-            GPIO.output(SPOTIFY_LED, GPIO.LOW)
-            GPIO.output(RADIO_LED, GPIO.HIGH)
-    elif (source_select_state[1]):
+    elif (source_select_state["spotify"]):
         # spotify
-        if source_selector.getState() != 2:
+        if source_selector.getState() != Sources.SPOTIFY:
+            snap.sendCommand("Client.SetVolume", "{\"id\":\"" + os.getenv("SNAP_CLIENT_ID") + "\",\"volume\":{\"muted\": false }}")
             snap.sendCommand("Group.SetStream", "{\"id\": \"" + group_id + "\",\"stream_id\": \"Spotify\"}")
             source_selector.spotify()
             print(source_selector.getState())
-            GPIO.output(SPOTIFY_LED, GPIO.HIGH)
-            GPIO.output(RADIO_LED, GPIO.LOW)
+
+    # Radio station button
+    if source_selector.getState() == Sources.RADIO:
+        radio_btn_state = GPIO.input(RADIO_BTN)
+        if (radio_btn_state == GPIO.LOW and not radio_btn_pressed):
+            # send Next command to MPD
+            mpd.sendCommand("next")
+            print("send next to MPD")
+            radio_btn_pressed = True
+        elif (radio_btn_state == GPIO.HIGH and radio_btn_pressed):
+            print("RADIO_BTN: done")
+            radio_btn_pressed = False
 
 
     if flag.exit():
