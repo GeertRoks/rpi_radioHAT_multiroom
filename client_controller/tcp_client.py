@@ -28,6 +28,7 @@ class ServiceClient:
         self.sock.send(f"{msg}\n".encode())
         return self.readMessage()
 
+    # source: https://stackoverflow.com/questions/1655560/how-do-you-flush-python-sockets
     def empty(self):
         self.sock.setblocking(0)
         while True:

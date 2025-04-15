@@ -30,3 +30,6 @@ class GPIO_Config:
 
     def setSpotifyLed(self, state):
         GPIO.output(self.SPOTIFY_LED, state)
+
+    def addBtnEvent(self, channel, callback):
+        GPIO.add_event_detect(channel, GPIO.FALLING, callback=callback, bouncetime=300)
