@@ -1,16 +1,24 @@
 import os
 import time
+from enum import Enum
+
 import tcp_client as tcp
-import source_control as src
 from helpers import GracefulExiter
+
+class Sources(Enum):
+    OFF = 0
+    RADIO = 1
+    SPOTIFY = 2
 
 class Radio:
     def __init__(self):
         # Setup connections to Snapcast and MPD servers
         self.snap = tcp.SnapClient(os.getenv("SNAP_IP"), os.getenv("SNAP_PORT"))
         self.mpd = tcp.MPDClient(os.getenv("MPD_IP"), os.getenv("MPD_PORT"))
-        self.source_selector = src.SourceState()
+
+        # TODO: combine all flags in an object
         self.radio_btn_flag = False
+        self.source_selected = Sources.OFF
 
         # Get Group ID
         json_data = self.snap.sendCommand("Server.GetStatus")
@@ -41,26 +49,26 @@ class Radio:
             source_select_state = gpio.getSourceSelectState()
             if (source_select_state["radio"] and source_select_state["spotify"]):
                 # off
-                if self.source_selector.getState() != src.Sources.OFF:
-                    self.source_selector.off()
-                    print(self.source_selector.getState())
+                if self.source_selected != Sources.OFF:
+                    self.source_selected = Sources.OFF
+                    print(self.source_selected)
                     self.snap.sendCommand("Client.SetVolume", "{\"id\":\"" + os.getenv("SNAP_CLIENT_ID") + "\",\"volume\":{\"muted\": true }}")
                     gpio.setRadioLed(False)
                     gpio.setSpotifyLed(False)
             elif (source_select_state["radio"]):
                 # radio
-                if self.source_selector.getState() != src.Sources.RADIO:
-                    self.source_selector.radio()
-                    print(self.source_selector.getState())
+                if self.source_selected != Sources.RADIO:
+                    self.source_selected = Sources.RADIO
+                    print(self.source_selected)
                     self.snap.sendCommand("Client.SetVolume", "{\"id\":\"" + os.getenv("SNAP_CLIENT_ID") + "\",\"volume\":{\"muted\": false }}")
                     self.snap.sendCommand("Group.SetStream", "{\"id\": \"" + self.group_id + "\",\"stream_id\": \"Radio\"}")
                     gpio.setRadioLed(True)
                     gpio.setSpotifyLed(False)
             elif (source_select_state["spotify"]):
                 # spotify
-                if self.source_selector.getState() != src.Sources.SPOTIFY:
-                    self.source_selector.spotify()
-                    print(self.source_selector.getState())
+                if self.source_selected != Sources.SPOTIFY:
+                    self.source_selected = Sources.SPOTIFY
+                    print(self.source_selected)
                     self.snap.sendCommand("Client.SetVolume", "{\"id\":\"" + os.getenv("SNAP_CLIENT_ID") + "\",\"volume\":{\"muted\": false }}")
                     self.snap.sendCommand("Group.SetStream", "{\"id\": \"" + self.group_id + "\",\"stream_id\": \"Spotify\"}")
                     gpio.setRadioLed(False)
@@ -68,7 +76,7 @@ class Radio:
 
             if self.radio_btn_flag:
                 self.radio_btn_flag = False
-                if self.source_selector.getState() == src.Sources.RADIO:
+                if self.source_selected == Sources.RADIO:
                     print("Radio button: next")
                     self.mpd.sendCommand("next")
                     # blink the Radio LED to indicate that the press is registered
