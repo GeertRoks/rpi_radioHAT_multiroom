@@ -1,4 +1,10 @@
 import signal
+from enum import Enum
+
+class Sources(Enum):
+    OFF = 0
+    RADIO = 1
+    SPOTIFY = 2
 
 # source: https://stackoverflow.com/questions/24426451/how-to-terminate-loop-gracefully-when-ctrlc-was-pressed-in-python
 class GracefulExiter():

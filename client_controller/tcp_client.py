@@ -70,7 +70,6 @@ class SnapClient(ServiceClient):
         self.msg_count += 1
         data = self.sendToServer(msg)
         try:
-            print(data)
             json_data = json.loads(data)
         except Exception as e:
             raise e

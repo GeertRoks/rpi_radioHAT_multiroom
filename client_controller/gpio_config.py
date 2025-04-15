@@ -1,4 +1,5 @@
 import RPi.GPIO as GPIO
+from helpers import Sources
 
 class GPIO_Config:
     # Define GPIO ports
@@ -20,7 +21,18 @@ class GPIO_Config:
         GPIO.cleanup()
 
     def getSourceSelectState(self):
-        return {"radio": GPIO.input(self.SRC_SEL_RADIO), "spotify": GPIO.input(self.SRC_SEL_SPOTIFY) }
+        source_states = {"radio": GPIO.input(self.SRC_SEL_RADIO), "spotify": GPIO.input(self.SRC_SEL_SPOTIFY) }
+        match source_states:
+            case {"radio": GPIO.HIGH, "spotify": GPIO.HIGH}:
+                return Sources.OFF
+            case {"radio": GPIO.LOW, "spotify": GPIO.HIGH}:
+                return Sources.RADIO
+            case {"radio": GPIO.HIGH, "spotify": GPIO.LOW}:
+                return Sources.SPOTIFY
+            case _:
+                # TODO: write this to a log or handle as Error exception
+                print("GPIO_Config.getSourceSelectState(): invalid source select")
+                return Sources.OFF
 
     def getRadioBtnState(self):
         return GPIO.input(self.RADIO_BTN)
@@ -33,3 +45,18 @@ class GPIO_Config:
 
     def addBtnEvent(self, channel, callback):
         GPIO.add_event_detect(channel, GPIO.FALLING, callback=callback, bouncetime=300)
+
+    def addSourceSwitchEvent(self, channel, callback):
+        GPIO.add_event_detect(channel, GPIO.BOTH, callback=callback, bouncetime=100)
+
+    def setLedState(self, state):
+        match state:
+            case Sources.OFF:
+                self.setRadioLed(False)
+                self.setSpotifyLed(False)
+            case Sources.RADIO:
+                self.setRadioLed(True)
+                self.setSpotifyLed(False)
+            case Sources.SPOTIFY:
+                self.setRadioLed(False)
+                self.setSpotifyLed(True)
