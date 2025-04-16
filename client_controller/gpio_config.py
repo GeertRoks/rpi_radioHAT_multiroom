@@ -1,5 +1,5 @@
 import RPi.GPIO as GPIO
-from helpers import Sources
+from states import Sources
 
 class GPIO_Config:
     # Define GPIO ports

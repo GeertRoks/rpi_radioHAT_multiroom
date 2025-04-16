@@ -14,9 +14,9 @@ radio = Radio()
 gpio = GPIO_Config()
 
 # register hardware events
-gpio.addBtnEvent(gpio.RADIO_BTN, radio.radio_btn_callback)
-gpio.addSourceSwitchEvent(gpio.SRC_SEL_RADIO, radio.source_switch_callback)
-gpio.addSourceSwitchEvent(gpio.SRC_SEL_SPOTIFY, radio.source_switch_callback)
+gpio.addBtnEvent(gpio.RADIO_BTN, radio.radio_button_event)
+gpio.addSourceSwitchEvent(gpio.SRC_SEL_RADIO, radio.source_switch_event)
+gpio.addSourceSwitchEvent(gpio.SRC_SEL_SPOTIFY, radio.source_switch_event)
 
 # main loop
 radio.run(gpio)

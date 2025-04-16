@@ -1,9 +1,9 @@
 import os
 import time
+import signal
 
 import tcp_client as tcp
-from helpers import GracefulExiter
-from helpers import Sources
+from states import Sources
 
 class Radio:
     def __init__(self):
@@ -13,33 +13,41 @@ class Radio:
 
         self.source_selected = Sources.OFF
 
-        # TODO: combine all flags in an object
-        self.exit_flag = GracefulExiter()
-        self.radio_btn_flag = False
-        self.source_switch_flag = False
+        # Event flags
+        self.flags = {"radio_station": False,
+                      "source_select": False,
+                      "exit": False}
+        signal.signal(signal.SIGINT, self.exit_event)
 
-        # Get Group ID
-        json_data = self.snap.sendCommand("Server.GetStatus")
-        groups = json_data["result"]["server"]["groups"]
-        for group in groups:
-            for client in group["clients"]:
-                if client["id"] == os.getenv("SNAP_CLIENT_ID"):
-                    self.group_id = group["id"]
-                    break
+        # Set Snapcast info
+        self.client_id = os.getenv("SNAP_CLIENT_ID")
+        self.group_id = self.getGroupID(self.snap.sendCommand("Server.GetStatus"))
 
     def __del__(self):
         del self.snap
         del self.mpd
 
-    def radio_btn_callback(self, channel):
+    def getGroupID(self, server_data_json):
+        groups = server_data_json["result"]["server"]["groups"]
+        for group in groups:
+            for client in group["clients"]:
+                if client["id"] == self.client_id:
+                    return group["id"]
+
+    def radio_button_event(self, channel):
         if self.source_selected == Sources.RADIO:
             print("Radio button: next")
-            self.radio_btn_flag = True
+            self.flags["radio_station"] = True
 
-    def source_switch_callback(self, channel):
+    def source_switch_event(self, channel):
         # TODO: write to log instead
         print(f"Source switch event: {channel}")
-        self.source_switch_flag = True
+        self.flags["source_select"] = True
+
+    def exit_event(self, signum, frame):
+        print("Ctrl+C detected, exiting now ...")
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        self.flags["exit"] = True
 
 
     def setSourceState(self):
@@ -63,24 +71,24 @@ class Radio:
             notify(new_state)
 
     def run(self, gpio):
-        while True:
+        while not self.flags["exit"]:
 
             # TODO: handle snapcast onUpdate notifications before emptying
             # empty the TCP stream
             self.mpd.empty()
             self.snap.empty()
 
-            if self.radio_btn_flag:
-                self.radio_btn_flag = False
+            # Handle Radio station button
+            if self.flags["radio_station"]:
+                self.flags["radio_station"] = False
                 self.mpd.sendCommand("next")
                 # blink the Radio LED to indicate that the press is registered
                 gpio.setRadioLed(False)
                 time.sleep(0.1)
                 gpio.setRadioLed(True)
 
-            if self.source_switch_flag:
-                self.source_flag = False
+            # Handle Source select switch
+            if self.flags["source_select"]:
+                self.flags["source_select"] = False
                 self.updateSourceSelect(gpio.getSourceSelectState(), gpio.setLedState)
 
-            if self.exit_flag.exit():
-                break
