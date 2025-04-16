@@ -1,5 +1,4 @@
 import os
-import time
 import signal
 
 import tcp_client as tcp
@@ -81,14 +80,11 @@ class Radio:
             # Handle Radio station button
             if self.flags["radio_station"]:
                 self.flags["radio_station"] = False
+                gpio.blinkLed(gpio.RADIO_LED, repeat=2, period=0.1)
                 self.mpd.sendCommand("next")
-                # blink the Radio LED to indicate that the press is registered
-                gpio.setRadioLed(False)
-                time.sleep(0.1)
-                gpio.setRadioLed(True)
 
             # Handle Source select switch
             if self.flags["source_select"]:
                 self.flags["source_select"] = False
-                self.updateSourceSelect(gpio.getSourceSelectState(), gpio.setLedState)
+                self.updateSourceSelect(gpio.getSourceSelectState(), gpio.setSourceSelectLeds)
 

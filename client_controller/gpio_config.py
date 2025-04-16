@@ -1,4 +1,6 @@
+import time
 import RPi.GPIO as GPIO
+
 from states import Sources
 
 class GPIO_Config:
@@ -20,6 +22,19 @@ class GPIO_Config:
     def __del__(self):
         GPIO.cleanup()
 
+    def blinkLed(self, pin, repeat = 1, period = 0.1):
+        delay = period/2
+        for i in range(repeat):
+            self.toggleLed(pin)
+            time.sleep(delay)
+            self.toggleLed(pin)
+            if (i < repeat-1):
+                time.sleep(delay)
+
+    def toggleLed(self, pin):
+        state = GPIO.input(pin)
+        GPIO.output(pin, not state)
+
     def getSourceSelectState(self):
         source_states = {"radio": GPIO.input(self.SRC_SEL_RADIO), "spotify": GPIO.input(self.SRC_SEL_SPOTIFY) }
         match source_states:
@@ -34,29 +49,20 @@ class GPIO_Config:
                 print("GPIO_Config.getSourceSelectState(): invalid source select")
                 return Sources.OFF
 
-    def getRadioBtnState(self):
-        return GPIO.input(self.RADIO_BTN)
-
-    def setRadioLed(self, state):
-        GPIO.output(self.RADIO_LED, state)
-
-    def setSpotifyLed(self, state):
-        GPIO.output(self.SPOTIFY_LED, state)
-
     def addBtnEvent(self, channel, callback):
         GPIO.add_event_detect(channel, GPIO.FALLING, callback=callback, bouncetime=300)
 
     def addSourceSwitchEvent(self, channel, callback):
         GPIO.add_event_detect(channel, GPIO.BOTH, callback=callback, bouncetime=100)
 
-    def setLedState(self, state):
+    def setSourceSelectLeds(self, state):
         match state:
             case Sources.OFF:
-                self.setRadioLed(False)
-                self.setSpotifyLed(False)
+                GPIO.output(self.RADIO_LED, GPIO.LOW)
+                GPIO.output(self.SPOTIFY_LED, GPIO.LOW)
             case Sources.RADIO:
-                self.setRadioLed(True)
-                self.setSpotifyLed(False)
+                GPIO.output(self.RADIO_LED, GPIO.HIGH)
+                GPIO.output(self.SPOTIFY_LED, GPIO.LOW)
             case Sources.SPOTIFY:
-                self.setRadioLed(False)
-                self.setSpotifyLed(True)
+                GPIO.output(self.RADIO_LED, GPIO.LOW)
+                GPIO.output(self.SPOTIFY_LED, GPIO.HIGH)
