@@ -49,12 +49,6 @@ class GPIO_Config:
                 print("GPIO_Config.getSourceSelectState(): invalid source select")
                 return Sources.OFF
 
-    def addBtnEvent(self, channel, callback):
-        GPIO.add_event_detect(channel, GPIO.FALLING, callback=callback, bouncetime=300)
-
-    def addSourceSwitchEvent(self, channel, callback):
-        GPIO.add_event_detect(channel, GPIO.BOTH, callback=callback, bouncetime=100)
-
     def setSourceSelectLeds(self, state):
         match state:
             case Sources.OFF:
@@ -66,3 +60,9 @@ class GPIO_Config:
             case Sources.SPOTIFY:
                 GPIO.output(self.RADIO_LED, GPIO.LOW)
                 GPIO.output(self.SPOTIFY_LED, GPIO.HIGH)
+
+    def addBtnEvent(self, channel, callback):
+        GPIO.add_event_detect(channel, GPIO.FALLING, callback=callback, bouncetime=300)
+
+    def addSourceSwitchEvent(self, channel, callback):
+        GPIO.add_event_detect(channel, GPIO.BOTH, callback=callback, bouncetime=100)
