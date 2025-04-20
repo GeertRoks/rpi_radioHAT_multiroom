@@ -45,7 +45,7 @@ class ServiceClient:
         return self.readMessage()
 
     # source: https://stackoverflow.com/questions/1655560/how-do-you-flush-python-sockets
-    def empty(self):
+    def flush(self):
         self.sock.setblocking(0)
         while True:
             try:

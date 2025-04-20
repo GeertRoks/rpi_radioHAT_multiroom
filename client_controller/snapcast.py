@@ -1,22 +1,14 @@
-from os import getenv
-
 from tcp_client import ConnectionError, SnapClient
 
-class EnvironmentVariableNotFound(Exception):
-    pass
-
 class Snapcast:
-    def __init__(self, ip, port):
+    def __init__(self, ip, port, client_id):
         try:
             self.snap = SnapClient(ip, port)
         except ConnectionError as e:
             print(f"ERROR: failed to create SnapClient.\n\t{e}")
             raise e
 
-        self.client_id = getenv("SNAP_CLIENT_ID")
-        if not self.client_id:
-            print(self.client_id)
-            raise EnvironmentVariableNotFound("ERROR: SNAP_CLIENT_ID not defined")
+        self.client_id = client_id
 
         # Set Snapcast info
         self.syncStateWithServer()

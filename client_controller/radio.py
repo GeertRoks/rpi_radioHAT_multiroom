@@ -2,31 +2,42 @@ from os import getenv
 import signal
 
 from snapcast import Snapcast
-from tcp_client import MPDClient
+from internetradio import InternetRadio
 from states import Sources
+
+class EnvironmentVariableNotFound(Exception):
+    pass
 
 class Radio:
     def __init__(self):
-        snap_ip = getenv("SNAP_IP")
-        snap_port = getenv("SNAP_PORT")
-        mpd_ip = getenv("MPD_IP")
-        mpd_port = getenv("MPD_PORT")
+        snap_client_id = self.loadEnvironmentVariable("SNAP_CLIENT_ID")
+        snap_ip = self.loadEnvironmentVariable("SNAP_IP")
+        snap_port = self.loadEnvironmentVariable("SNAP_PORT")
+        mpd_ip = self.loadEnvironmentVariable("MPD_IP")
+        mpd_port = self.loadEnvironmentVariable("MPD_PORT")
         try:
-            self.snapclient = Snapcast(snap_ip, snap_port)
+            self.snapclient = Snapcast(snap_ip, snap_port, snap_client_id)
         except Exception as e:
             raise e
 
-        # TODO: create MPD class that contains MPD state, like isPlaying and playlistLoaded
-        self.mpd = MPDClient(mpd_ip, mpd_port)
+        try:
+            self.internetradio = InternetRadio(mpd_ip, mpd_port)
+        except Exception as e:
+            raise e
 
         # Event flags
-        self.flags = {"radio_station": False,
+        self.flags = {"next_radio_station": False,
                       "source_select": False,
                       "exit": False}
         signal.signal(signal.SIGINT, self.exit_event)
 
         self.source_selected = Sources.OFF
 
+    def loadEnvironmentVariable(self, env):
+        value = getenv(env)
+        if not value:
+            raise EnvironmentVariableNotFound(f"ERROR: {env} not defined")
+        return value
 
     def setSourceState(self, state):
         self.source_selected = state
@@ -72,7 +83,7 @@ class Radio:
         if self.source_selected == Sources.RADIO:
             # TODO: write to log instead
             print("Radio button: next")
-            self.flags["radio_station"] = True
+            self.flags["next_radio_station"] = True
 
     def source_switch_event(self, channel):
         # TODO: write to log instead
@@ -95,14 +106,14 @@ class Radio:
 
             # TODO: handle snapcast onUpdate notifications
             # TODO: manage emptying in respective classes
-            self.snapclient.snap.empty()
-            self.mpd.empty()
+            self.snapclient.snap.flush()
+            self.internetradio.mpd.flush()
 
             # Handle Radio station button
-            if self.flags["radio_station"]:
-                self.flags["radio_station"] = False
+            if self.flags["next_radio_station"]:
+                self.flags["next_radio_station"] = False
                 gpio.blinkLed(gpio.RADIO_LED, repeat=2, period=0.1)
-                self.mpd.sendCommand("next")
+                self.internetradio.next()
 
             # Handle Source select switch
             if self.flags["source_select"]:
