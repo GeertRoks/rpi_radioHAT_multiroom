@@ -1,18 +1,27 @@
-import os
+from os import getenv
 
-import tcp_client as tcp
+from tcp_client import ConnectionError, SnapClient
+
+class EnvironmentVariableNotFound(Exception):
+    pass
 
 class Snapcast:
-    def __init__(self):
-        self.snap = tcp.SnapClient(os.getenv("SNAP_IP"), os.getenv("SNAP_PORT"))
+    def __init__(self, ip, port):
+        try:
+            self.snap = SnapClient(ip, port)
+        except ConnectionError as e:
+            print(f"ERROR: failed to create SnapClient.\n\t{e}")
+            raise e
+
+        self.client_id = getenv("SNAP_CLIENT_ID")
+        if not self.client_id:
+            print(self.client_id)
+            raise EnvironmentVariableNotFound("ERROR: SNAP_CLIENT_ID not defined")
 
         # Set Snapcast info
         self.syncStateWithServer()
-        self.client_id = os.getenv("SNAP_CLIENT_ID")
         self.group_id = self.getGroupID()
 
-    def __del__(self):
-        del self.snap
 
     def syncStateWithServer(self):
         self.server_state = self.snap.sendCommand("Server.GetStatus")
@@ -43,10 +52,10 @@ class Snapcast:
         return None
 
     def mute(self):
-        self.snap.sendCommand("Client.SetVolume", "{\"id\":\"" + os.getenv("SNAP_CLIENT_ID") + "\",\"volume\":{\"muted\": true }}")
+        self.snap.sendCommand("Client.SetVolume", "{\"id\":\"" + self.client_id + "\",\"volume\":{\"muted\": true }}")
 
     def unmute(self):
-        self.snap.sendCommand("Client.SetVolume", "{\"id\":\"" + os.getenv("SNAP_CLIENT_ID") + "\",\"volume\":{\"muted\": false }}")
+        self.snap.sendCommand("Client.SetVolume", "{\"id\":\"" + self.client_id + "\",\"volume\":{\"muted\": false }}")
 
     def setSourceToRadio(self):
         self.snap.sendCommand("Group.SetStream", "{\"id\": \"" + self.group_id + "\",\"stream_id\": \"Radio\"}")
@@ -58,7 +67,7 @@ class Snapcast:
         client = self.getClientData()
         if not client:
             # TODO: write this to a log instead, or throw exception
-            print ("Error: no client data available")
+            print ("ERROR: no client data available")
             return None
         return client["config"]["volume"]["muted"]
 

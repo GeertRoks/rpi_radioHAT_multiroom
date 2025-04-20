@@ -1,10 +1,21 @@
 import socket
 import json
 
+class ConnectionError(Exception):
+    pass
+
+class SocketError(Exception):
+    pass
+
+
 class ServiceClient:
     def __init__(self, ip, port):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((ip, int(port)))
+        try:
+            self.sock.connect((ip, int(port)))
+        except socket.error as e:
+            print(e)
+            raise ConnectionError(f"Can't reach server located at {ip}:{port}")
 
     def __del__(self):
         self.sock.close()
@@ -25,7 +36,12 @@ class ServiceClient:
         return message
 
     def sendToServer(self, msg):
-        self.sock.send(f"{msg}\n".encode())
+        try:
+            self.sock.send(f"{msg}\n".encode())
+        except socket.error as e:
+            if self.sock._closed:
+                raise SocketError("ERROR: trying to send message, while socket is already closed")
+            raise SocketError(f"ERROR: something when wrong when sending the message. \n\t {e}")
         return self.readMessage()
 
     # source: https://stackoverflow.com/questions/1655560/how-do-you-flush-python-sockets

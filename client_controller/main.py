@@ -8,7 +8,11 @@ from radio import Radio
 load_dotenv()
 
 # setup the Radio
-radio = Radio()
+try:
+    radio = Radio()
+except Exception as e:
+    print(e)
+    exit()
 
 # setup GPIO
 gpio = GPIO_Config()

@@ -1,16 +1,23 @@
-import os
+from os import getenv
 import signal
 
 from snapcast import Snapcast
-import tcp_client as tcp
+from tcp_client import MPDClient
 from states import Sources
 
 class Radio:
     def __init__(self):
-        self.snapclient = Snapcast()
+        snap_ip = getenv("SNAP_IP")
+        snap_port = getenv("SNAP_PORT")
+        mpd_ip = getenv("MPD_IP")
+        mpd_port = getenv("MPD_PORT")
+        try:
+            self.snapclient = Snapcast(snap_ip, snap_port)
+        except Exception as e:
+            raise e
 
-        # TODO: create MPD class that contains MPD state, like is playing and playlist is loaded
-        self.mpd = tcp.MPDClient(os.getenv("MPD_IP"), os.getenv("MPD_PORT"))
+        # TODO: create MPD class that contains MPD state, like isPlaying and playlistLoaded
+        self.mpd = MPDClient(mpd_ip, mpd_port)
 
         # Event flags
         self.flags = {"radio_station": False,
@@ -20,8 +27,6 @@ class Radio:
 
         self.source_selected = Sources.OFF
 
-    def __del__(self):
-        del self.mpd
 
     def setSourceState(self, state):
         self.source_selected = state
